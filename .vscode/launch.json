@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug encrypt_decrypt",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/encrypt_decrypt.exe",
+            "preLaunchTask": "build",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "externalTerminal",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Debug cryption (standalone)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/cryption.exe",
+            "args": ["your_task_data_here"],
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "externalTerminal",
+            "stopAtEntry": false
+        }
+    ]
+}
