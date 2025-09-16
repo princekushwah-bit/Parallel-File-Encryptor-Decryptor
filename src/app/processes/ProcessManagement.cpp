@@ -2,26 +2,59 @@
 #include <iostream>
 #include <string>
 #include "../encryptDecrypt/Cryption.hpp"
-#ifdef __unix__
-#include <sys/wait.h>
-// Unix-specific code
-#elif defined(_WIN32) || defined(WIN32)
-// Windows-specific headers and code
-#endif
 
+ProcessManagement::ProcessManagement(size_t numThreads) : stop(false) {
+    for(size_t i = 0; i < numThreads; i++) {
+        workers.emplace_back(&ProcessManagement::workerThread, this);
+    }
+}
 
-ProcessManagement::ProcessManagement(){}
+ProcessManagement::~ProcessManagement() {
+    stop = true;
+    cv.notify_all();
+    for(auto &t : workers) {
+        if(t.joinable()) t.join();
+    }
+}
 
-bool ProcessManagement::submitToQueue(std::unique_ptr<Task> task){
-    taskQueue.push(std::move(task));
+bool ProcessManagement::submitToQueue(std::unique_ptr<Task> task) {
+    {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        taskQueue.push(std::move(task));
+    }
+    cv.notify_one();
     return true;
 }
 
-void ProcessManagement::executeTasks(){
-    while(!taskQueue.empty()){
-        std::unique_ptr<Task> taskToExecute = std::move(taskQueue.front());
-        taskQueue.pop();
-        std::cout << "Executing task: " << taskToExecute->toString() << std::endl;
-        executeCryption(taskToExecute->toString());
+void ProcessManagement::executeTasks() {
+    // Wait until all tasks finish
+    {
+        std::unique_lock<std::mutex> lock(queueMutex);
+        cv.wait(lock, [this]() { return taskQueue.empty(); });
+    }
+    // Allow workers to finish pending tasks
+}
+
+void ProcessManagement::workerThread() {
+    while(true) {
+        std::unique_ptr<Task> taskToExecute;
+
+        {
+            std::unique_lock<std::mutex> lock(queueMutex);
+            cv.wait(lock, [this]() { return stop || !taskQueue.empty(); });
+
+            if(stop && taskQueue.empty()) return;
+
+            taskToExecute = std::move(taskQueue.front());
+            taskQueue.pop();
+        }
+
+        if(taskToExecute) {
+            std::cout << "Thread " << std::this_thread::get_id()
+                      << " executing task: " << taskToExecute->toString() << std::endl;
+            executeCryption(taskToExecute->toString());
+        }
+
+        cv.notify_all();
     }
 }
